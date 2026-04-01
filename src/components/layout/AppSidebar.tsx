@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin'] },
   { label: 'Tables', path: '/tables', icon: Grid3X3, roles: ['admin', 'waiter'] },
-  { label: 'Orders', path: '/orders', icon: ClipboardList, roles: ['admin'] },
+  { label: 'Orders', path: '/orders', icon: ClipboardList, roles: ['admin', 'waiter'] },
   { label: 'Online Orders', path: '/online-orders', icon: Globe, roles: ['admin'] },
   { label: 'Delivery Tracking', path: '/delivery', icon: MapPin, roles: ['admin'] },
-  { label: 'Menu', path: '/menu', icon: BookOpen, roles: ['admin'] },
+  { label: 'Menu', path: '/menu', icon: BookOpen, roles: ['admin', 'waiter'] },
   { label: 'Waiters', path: '/waiters', icon: Users, roles: ['admin'] },
-  { label: 'Payments', path: '/payments', icon: CreditCard, roles: ['admin'] },
+  { label: 'Payments', path: '/payments', icon: CreditCard, roles: ['admin', 'waiter'] },
   { label: 'Settings', path: '/settings', icon: Settings, roles: ['admin', 'waiter'] },
 ];
 

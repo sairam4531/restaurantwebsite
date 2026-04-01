@@ -41,6 +41,9 @@ const WaiterRoutes = () => (
     <Routes>
       <Route index element={<Navigate to="/tables" replace />} />
       <Route path="tables" element={<Tables />} />
+      <Route path="orders" element={<Orders />} />
+      <Route path="menu" element={<MenuPage />} />
+      <Route path="payments" element={<Payments />} />
       <Route path="settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/tables" replace />} />
     </Routes>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import {
-  Table, Order, OnlineOrder, CartItem, MenuItem, OrderStatus, OnlineOrderStatus,
+  Table, Order, OnlineOrder, CartItem, MenuItem, OrderStatus, OnlineOrderStatus, MenuCategory,
   initialTables, initialOrders, initialOnlineOrders, menuItems, Waiter,
 } from '@/data/mockData';
 
@@ -29,6 +29,9 @@ interface AppContextType {
   updateOnlineOrderStatus: (orderId: string, status: OnlineOrderStatus) => void;
   completePayment: (tableId: number) => void;
   waiters: Waiter[];
+  updateTableSeats: (tableId: number, seats: number) => void;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => void;
+  updateMenuItem: (itemId: string, updates: Partial<Omit<MenuItem, 'id'>>) => void;
   addWaiter: (name: string, username: string, password: string) => boolean;
   removeWaiter: (id: string) => void;
 }
@@ -49,16 +52,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('pos_auth') === 'true');
   const [tables, setTables] = useState<Table[]>(initialTables);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>(initialOnlineOrders);
+  const [onlineOrders] = useState<OnlineOrder[]>(initialOnlineOrders);
+  const [menu, setMenu] = useState<MenuItem[]>(() => {
+    const saved = localStorage.getItem('pos_menu');
+    return saved ? JSON.parse(saved) : menuItems;
+  });
   const [notifications, setNotifications] = useState<string[]>([]);
   const [waiters, setWaiters] = useState<Waiter[]>(() => {
     const saved = localStorage.getItem('pos_waiters');
     return saved ? JSON.parse(saved) : [];
   });
+  const [persistedTables, setPersistedTables] = useState<Table[]>(() => {
+    const saved = localStorage.getItem('pos_tables');
+    return saved ? JSON.parse(saved) : initialTables;
+  });
+  const [persistedOrders, setPersistedOrders] = useState<Order[]>(() => {
+    const saved = localStorage.getItem('pos_orders');
+    return saved ? JSON.parse(saved) : initialOrders;
+  });
+
+  useEffect(() => {
+    setTables(persistedTables);
+  }, [persistedTables]);
+
+  useEffect(() => {
+    setOrders(persistedOrders);
+  }, [persistedOrders]);
 
   useEffect(() => {
     localStorage.setItem('pos_waiters', JSON.stringify(waiters));
   }, [waiters]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_tables', JSON.stringify(tables));
+  }, [tables]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_orders', JSON.stringify(orders));
+  }, [orders]);
+
+  useEffect(() => {
+    localStorage.setItem('pos_menu', JSON.stringify(menu));
+  }, [menu]);
 
   useEffect(() => {
     if (!currentUser) {
@@ -97,9 +132,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTableStatus = useCallback((tableId: number, status: Table['status']) => {
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
+    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
+  }, []);
+
+  const updateTableSeats = useCallback((tableId: number, seats: number) => {
+    if (seats < 1) return;
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, seats } : t));
+    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, seats } : t));
   }, []);
 
   const createOrder = useCallback((tableId: number, items: CartItem[]) => {
+    const activeOrder = orders.find(order => order.tableId === tableId && order.status !== 'completed');
+    if (activeOrder) return;
+
     const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const order: Order = {
       id: `ORD${String(orders.length + 1).padStart(3, '0')}`,
@@ -110,21 +155,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
     };
     setOrders(prev => [...prev, order]);
+    setPersistedOrders(prev => [...prev, order]);
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'occupied' as const, orderId: order.id } : t));
+    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'occupied' as const, orderId: order.id } : t));
     setNotifications(prev => [...prev, `New dine-in order ${order.id} for Table ${tableId}`]);
-  }, [orders.length]);
+  }, [orders]);
 
   const updateOrderStatus = useCallback((orderId: string, status: OrderStatus) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    setPersistedOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
   }, []);
 
   const updateOnlineOrderStatus = useCallback((orderId: string, status: OnlineOrderStatus) => {
-    setOnlineOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    void orderId;
+    void status;
   }, []);
 
   const completePayment = useCallback((tableId: number) => {
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'available' as const, orderId: undefined } : t));
+    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'available' as const, orderId: undefined } : t));
     setOrders(prev => prev.map(o => o.tableId === tableId && o.status !== 'completed' ? { ...o, status: 'completed' as const } : o));
+    setPersistedOrders(prev => prev.map(o => o.tableId === tableId && o.status !== 'completed' ? { ...o, status: 'completed' as const } : o));
   }, []);
 
   const clearNotification = useCallback((index: number) => {
@@ -149,33 +200,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWaiters(prev => prev.filter(w => w.id !== id));
   }, []);
 
-  // Simulate new online order every 60s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const platforms: Array<'swiggy' | 'zomato'> = ['swiggy', 'zomato'];
-      const names = ['Vikram Singh', 'Neha Gupta', 'Arjun Mehta', 'Kavya Nair'];
-      const newOrder: OnlineOrder = {
-        id: `ONL${String(Date.now()).slice(-4)}`,
-        platform: platforms[Math.floor(Math.random() * 2)],
-        customerName: names[Math.floor(Math.random() * names.length)],
-        customerAddress: `${Math.floor(Math.random() * 999)}, Random Street, Bangalore`,
-        items: [{ name: 'Biryani', quantity: 1, price: 299 }],
-        total: 299,
-        paymentType: Math.random() > 0.5 ? 'prepaid' : 'cod',
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      };
-      setOnlineOrders(prev => [newOrder, ...prev]);
-      setNotifications(prev => [...prev, `New ${newOrder.platform} order ${newOrder.id} from ${newOrder.customerName}`]);
-    }, 60000);
-    return () => clearInterval(interval);
+  const addMenuItem = useCallback((item: Omit<MenuItem, 'id'>) => {
+    const nextItem: MenuItem = {
+      ...item,
+      id: `m${Date.now()}`,
+    };
+    setMenu(prev => [...prev, nextItem]);
+  }, []);
+
+  const updateMenuItem = useCallback((itemId: string, updates: Partial<Omit<MenuItem, 'id'>>) => {
+    setMenu(prev => prev.map(item => item.id === itemId ? { ...item, ...updates } : item));
   }, []);
 
   return (
     <AppContext.Provider value={{
-      isAuthenticated, currentUser, login, logout, tables, orders, onlineOrders, menu: menuItems,
+      isAuthenticated, currentUser, login, logout, tables, orders, onlineOrders, menu,
       notifications, clearNotification, updateTableStatus, createOrder, updateOrderStatus,
-      updateOnlineOrderStatus, completePayment, waiters, addWaiter, removeWaiter,
+      updateOnlineOrderStatus, completePayment, waiters, updateTableSeats, addMenuItem, updateMenuItem, addWaiter, removeWaiter,
     }}>
       {children}
     </AppContext.Provider>
