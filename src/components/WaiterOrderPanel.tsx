@@ -19,7 +19,7 @@ interface Props {
 }
 
 const WaiterOrderPanel = ({ tableId, onBack }: Props) => {
-  const { menu, orders, createOrder, updateOrderStatus } = useApp();
+  const { menu, orders, createOrder, updateOrderStatus, completePayment } = useApp();
   const [activeCategory, setActiveCategory] = useState<string>('starters');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState('');
@@ -27,7 +27,7 @@ const WaiterOrderPanel = ({ tableId, onBack }: Props) => {
   const existingOrder = orders.find(o => o.tableId === tableId && o.status !== 'completed');
 
   const filteredMenu = menu.filter(
-    item => item.category === activeCategory &&
+    item => item.available && item.category === activeCategory &&
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -96,6 +96,16 @@ const WaiterOrderPanel = ({ tableId, onBack }: Props) => {
                 Mark Served
               </Button>
             )}
+            {existingOrder.status === 'served' && (
+              <>
+                <Button size="sm" onClick={() => completePayment(tableId)} className="bg-primary text-primary-foreground">
+                  Collect Cash
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => completePayment(tableId)}>
+                  Collect Card
+                </Button>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -130,7 +140,7 @@ const WaiterOrderPanel = ({ tableId, onBack }: Props) => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {filteredMenu.map(item => (
               <div key={item.id} className="glass-card p-4 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div>
@@ -149,6 +159,9 @@ const WaiterOrderPanel = ({ tableId, onBack }: Props) => {
               </div>
             ))}
           </div>
+            {filteredMenu.length === 0 && (
+              <div className="glass-card p-6 text-sm text-muted-foreground">No available items in this category.</div>
+            )}
         </div>
 
         {/* Cart */}

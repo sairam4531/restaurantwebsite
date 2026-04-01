@@ -1,10 +1,11 @@
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const statusSteps = ['pending', 'preparing', 'served', 'completed'] as const;
 
 const Orders = () => {
-  const { orders, updateOrderStatus } = useApp();
+  const { orders, updateOrderStatus, completePayment, currentUser } = useApp();
   const activeOrders = orders.filter(o => o.status !== 'completed');
   const completedOrders = orders.filter(o => o.status === 'completed');
 
@@ -60,7 +61,14 @@ const Orders = () => {
                 </button>
               )}
               {order.status === 'served' && (
-                <span className="flex-1 py-2 text-sm font-medium text-center text-success">✓ Served</span>
+                currentUser?.role === 'waiter' ? (
+                  <div className="flex flex-1 gap-2">
+                    <Button onClick={() => completePayment(order.tableId)} className="flex-1">Cash</Button>
+                    <Button onClick={() => completePayment(order.tableId)} variant="outline" className="flex-1">Card</Button>
+                  </div>
+                ) : (
+                  <span className="flex-1 py-2 text-sm font-medium text-center text-success">Awaiting Payment</span>
+                )
               )}
             </div>
           </div>

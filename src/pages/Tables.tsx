@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Users } from 'lucide-react';
+import { Pencil, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import WaiterOrderPanel from '@/components/WaiterOrderPanel';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const Tables = () => {
-  const { tables } = useApp();
+  const { tables, currentUser, updateTableSeats } = useApp();
   const [selectedTable, setSelectedTable] = useState<number | null>(null);
+  const [editingTable, setEditingTable] = useState<number | null>(null);
+  const [seatValue, setSeatValue] = useState('');
 
   const statusConfig = {
     available: { label: 'Available', dot: 'bg-emerald-500', card: 'status-available' },
@@ -55,6 +59,41 @@ const Tables = () => {
                 <Users className="w-3.5 h-3.5" />
                 <span>{table.seats} seats</span>
               </div>
+              {currentUser?.role === 'admin' && (
+                <div className="mt-3" onClick={e => e.stopPropagation()}>
+                  {editingTable === table.id ? (
+                    <div className="flex gap-2">
+                      <Input
+                        value={seatValue}
+                        onChange={e => setSeatValue(e.target.value)}
+                        inputMode="numeric"
+                        className="h-8"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const seats = Number(seatValue);
+                          if (seats > 0) updateTableSeats(table.id, seats);
+                          setEditingTable(null);
+                          setSeatValue('');
+                        }}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingTable(table.id);
+                        setSeatValue(String(table.seats));
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      <Pencil className="w-3 h-3" /> Edit seats
+                    </button>
+                  )}
+                </div>
+              )}
               <p className="text-xs font-medium mt-2 capitalize">{config.label}</p>
             </button>
           );

@@ -3,6 +3,7 @@ export type OrderStatus = 'pending' | 'preparing' | 'served' | 'completed';
 export type OnlineOrderStatus = 'pending' | 'accepted' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered';
 export type Platform = 'swiggy' | 'zomato';
 export type PaymentType = 'prepaid' | 'cod';
+export type MenuCategory = 'starters' | 'main_course' | 'drinks' | 'desserts';
 
 export interface Table {
   id: number;
@@ -16,9 +17,10 @@ export interface MenuItem {
   id: string;
   name: string;
   price: number;
-  category: 'starters' | 'main_course' | 'drinks' | 'desserts';
+  category: MenuCategory;
   image?: string;
   veg: boolean;
+  available: boolean;
 }
 
 export interface CartItem extends MenuItem {
@@ -63,22 +65,22 @@ export const initialTables: Table[] = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 export const menuItems: MenuItem[] = [
-  { id: 'm1', name: 'Paneer Tikka', price: 249, category: 'starters', veg: true },
-  { id: 'm2', name: 'Chicken Wings', price: 299, category: 'starters', veg: false },
-  { id: 'm3', name: 'Spring Rolls', price: 179, category: 'starters', veg: true },
-  { id: 'm4', name: 'Fish Fingers', price: 329, category: 'starters', veg: false },
-  { id: 'm5', name: 'Butter Chicken', price: 349, category: 'main_course', veg: false },
-  { id: 'm6', name: 'Dal Makhani', price: 249, category: 'main_course', veg: true },
-  { id: 'm7', name: 'Biryani', price: 299, category: 'main_course', veg: false },
-  { id: 'm8', name: 'Paneer Butter Masala', price: 279, category: 'main_course', veg: true },
-  { id: 'm9', name: 'Naan', price: 49, category: 'main_course', veg: true },
-  { id: 'm10', name: 'Mojito', price: 149, category: 'drinks', veg: true },
-  { id: 'm11', name: 'Cold Coffee', price: 129, category: 'drinks', veg: true },
-  { id: 'm12', name: 'Lassi', price: 99, category: 'drinks', veg: true },
-  { id: 'm13', name: 'Fresh Lime Soda', price: 79, category: 'drinks', veg: true },
-  { id: 'm14', name: 'Gulab Jamun', price: 99, category: 'desserts', veg: true },
-  { id: 'm15', name: 'Ice Cream', price: 129, category: 'desserts', veg: true },
-  { id: 'm16', name: 'Brownie', price: 149, category: 'desserts', veg: true },
+  { id: 'm1', name: 'Paneer Tikka', price: 249, category: 'starters', veg: true, available: true },
+  { id: 'm2', name: 'Chicken Wings', price: 299, category: 'starters', veg: false, available: true },
+  { id: 'm3', name: 'Spring Rolls', price: 179, category: 'starters', veg: true, available: true },
+  { id: 'm4', name: 'Fish Fingers', price: 329, category: 'starters', veg: false, available: true },
+  { id: 'm5', name: 'Butter Chicken', price: 349, category: 'main_course', veg: false, available: true },
+  { id: 'm6', name: 'Dal Makhani', price: 249, category: 'main_course', veg: true, available: true },
+  { id: 'm7', name: 'Biryani', price: 299, category: 'main_course', veg: false, available: true },
+  { id: 'm8', name: 'Paneer Butter Masala', price: 279, category: 'main_course', veg: true, available: true },
+  { id: 'm9', name: 'Naan', price: 49, category: 'main_course', veg: true, available: true },
+  { id: 'm10', name: 'Mojito', price: 149, category: 'drinks', veg: true, available: true },
+  { id: 'm11', name: 'Cold Coffee', price: 129, category: 'drinks', veg: true, available: true },
+  { id: 'm12', name: 'Lassi', price: 99, category: 'drinks', veg: true, available: true },
+  { id: 'm13', name: 'Fresh Lime Soda', price: 79, category: 'drinks', veg: true, available: true },
+  { id: 'm14', name: 'Gulab Jamun', price: 99, category: 'desserts', veg: true, available: true },
+  { id: 'm15', name: 'Ice Cream', price: 129, category: 'desserts', veg: true, available: true },
+  { id: 'm16', name: 'Brownie', price: 149, category: 'desserts', veg: true, available: true },
 ];
 
 export const initialOrders: Order[] = [];
