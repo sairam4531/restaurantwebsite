@@ -7,25 +7,27 @@ import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Tables', path: '/tables', icon: Grid3X3 },
-  { label: 'Orders', path: '/orders', icon: ClipboardList },
-  { label: 'Online Orders', path: '/online-orders', icon: Globe },
-  { label: 'Delivery Tracking', path: '/delivery', icon: MapPin },
-  { label: 'Menu', path: '/menu', icon: BookOpen },
-  { label: 'Waiters', path: '/waiters', icon: Users },
-  { label: 'Payments', path: '/payments', icon: CreditCard },
-  { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin'] },
+  { label: 'Tables', path: '/tables', icon: Grid3X3, roles: ['admin', 'waiter'] },
+  { label: 'Orders', path: '/orders', icon: ClipboardList, roles: ['admin'] },
+  { label: 'Online Orders', path: '/online-orders', icon: Globe, roles: ['admin'] },
+  { label: 'Delivery Tracking', path: '/delivery', icon: MapPin, roles: ['admin'] },
+  { label: 'Menu', path: '/menu', icon: BookOpen, roles: ['admin'] },
+  { label: 'Waiters', path: '/waiters', icon: Users, roles: ['admin'] },
+  { label: 'Payments', path: '/payments', icon: CreditCard, roles: ['admin'] },
+  { label: 'Settings', path: '/settings', icon: Settings, roles: ['admin', 'waiter'] },
 ];
 
 interface Props {
   collapsed: boolean;
   onToggle: () => void;
+  role: 'admin' | 'waiter';
 }
 
-const AppSidebar = ({ collapsed }: Props) => {
+const AppSidebar = ({ collapsed, role }: Props) => {
   const location = useLocation();
   const { logout } = useApp();
+  const visibleItems = navItems.filter(item => item.roles.includes(role));
 
   return (
     <aside
@@ -44,7 +46,7 @@ const AppSidebar = ({ collapsed }: Props) => {
 
       {/* Nav */}
       <nav className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(item => {
+        {visibleItems.map(item => {
           const isActive = location.pathname === item.path;
           return (
             <Link

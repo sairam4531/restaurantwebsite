@@ -3,7 +3,7 @@ import { LogOut, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const SettingsPage = () => {
-  const { logout } = useApp();
+  const { logout, currentUser } = useApp();
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -16,14 +16,20 @@ const SettingsPage = () => {
           </div>
           <div>
             <h2 className="text-lg font-bold text-foreground">The Grand Kitchen</h2>
-            <p className="text-sm text-muted-foreground">Restaurant Management System</p>
+            <p className="text-sm text-muted-foreground">
+              {currentUser?.role === 'waiter' ? 'Waiter workspace' : 'Restaurant Management System'}
+            </p>
           </div>
         </div>
 
         <div className="space-y-4 text-sm">
           <div className="flex justify-between py-3 border-b border-border">
-            <span className="text-muted-foreground">Admin User</span>
-            <span className="text-foreground font-medium">sairohit45</span>
+            <span className="text-muted-foreground">Signed in as</span>
+            <span className="text-foreground font-medium capitalize">{currentUser?.role ?? 'admin'}</span>
+          </div>
+          <div className="flex justify-between py-3 border-b border-border">
+            <span className="text-muted-foreground">Username</span>
+            <span className="text-foreground font-medium">{currentUser?.username ?? 'sairohit45'}</span>
           </div>
           <div className="flex justify-between py-3 border-b border-border">
             <span className="text-muted-foreground">Version</span>
