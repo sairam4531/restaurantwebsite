@@ -79,6 +79,9 @@ const Payments = () => {
       {/* Online */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-3">Online Order Payments</h2>
+        {onlineOrders.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No online orders yet.</p>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {onlineOrders.slice(0, 6).map(order => (
             <div key={order.id} className="glass-card p-4 flex items-center justify-between">
@@ -106,6 +109,7 @@ const Payments = () => {
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );
