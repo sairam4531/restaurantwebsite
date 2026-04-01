@@ -14,7 +14,7 @@ const Login = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!login(username, password)) {
-      setError('Invalid credentials');
+      setError('Invalid username or password');
     }
   };
 
@@ -27,7 +27,7 @@ const Login = () => {
               <UtensilsCrossed className="w-8 h-8 text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">RestaurantOS</h1>
-            <p className="text-muted-foreground text-sm mt-1">Restaurant Management System</p>
+            <p className="text-muted-foreground text-sm mt-1">Admin and waiter access</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

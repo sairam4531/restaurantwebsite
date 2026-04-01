@@ -4,8 +4,17 @@ import {
   initialTables, initialOrders, initialOnlineOrders, menuItems, Waiter,
 } from '@/data/mockData';
 
+type UserRole = 'admin' | 'waiter';
+
+interface AuthUser {
+  role: UserRole;
+  username: string;
+  name: string;
+}
+
 interface AppContextType {
   isAuthenticated: boolean;
+  currentUser: AuthUser | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
   tables: Table[];
@@ -33,6 +42,10 @@ export const useApp = () => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    const saved = localStorage.getItem('pos_auth_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('pos_auth') === 'true');
   const [tables, setTables] = useState<Table[]>(initialTables);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -47,18 +60,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('pos_waiters', JSON.stringify(waiters));
   }, [waiters]);
 
+  useEffect(() => {
+    if (!currentUser) {
+      setIsAuthenticated(false);
+      localStorage.removeItem('pos_auth');
+      localStorage.removeItem('pos_auth_user');
+      return;
+    }
+
+    setIsAuthenticated(true);
+    localStorage.setItem('pos_auth', 'true');
+    localStorage.setItem('pos_auth_user', JSON.stringify(currentUser));
+  }, [currentUser]);
+
   const login = useCallback((username: string, password: string) => {
     if (username === 'sairohit45' && password === '453123') {
-      setIsAuthenticated(true);
-      localStorage.setItem('pos_auth', 'true');
+      setCurrentUser({ role: 'admin', username, name: 'Admin' });
       return true;
     }
+
+    const matchedWaiter = waiters.find(waiter => waiter.username === username && waiter.password === password);
+    if (matchedWaiter) {
+      setCurrentUser({ role: 'waiter', username: matchedWaiter.username, name: matchedWaiter.name });
+      return true;
+    }
+
     return false;
-  }, []);
+  }, [waiters]);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
     localStorage.removeItem('pos_auth');
+    localStorage.removeItem('pos_auth_user');
   }, []);
 
   const updateTableStatus = useCallback((tableId: number, status: Table['status']) => {
@@ -98,7 +132,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const addWaiter = useCallback((name: string, username: string, password: string) => {
-    const exists = waiters.some(w => w.username === username);
+    const exists = waiters.some(w => w.username === username) || username === 'sairohit45';
     if (exists) return false;
     const waiter: Waiter = {
       id: `W${Date.now()}`,
@@ -139,7 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      isAuthenticated, login, logout, tables, orders, onlineOrders, menu: menuItems,
+      isAuthenticated, currentUser, login, logout, tables, orders, onlineOrders, menu: menuItems,
       notifications, clearNotification, updateTableStatus, createOrder, updateOrderStatus,
       updateOnlineOrderStatus, completePayment, waiters, addWaiter, removeWaiter,
     }}>
