@@ -3,6 +3,7 @@ import {
   Table, Order, OnlineOrder, CartItem, MenuItem, OrderStatus, OnlineOrderStatus, MenuCategory,
   initialTables, initialOrders, initialOnlineOrders, menuItems, Waiter,
 } from '@/data/mockData';
+import { apiUrl } from '@/lib/api';
 
 type UserRole = 'admin' | 'waiter';
 
@@ -20,6 +21,7 @@ interface AppContextType {
   tables: Table[];
   orders: Order[];
   onlineOrders: OnlineOrder[];
+  onlineOrdersLoading: boolean;
   menu: MenuItem[];
   notifications: string[];
   clearNotification: (index: number) => void;
@@ -52,7 +54,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('pos_auth') === 'true');
   const [tables, setTables] = useState<Table[]>(initialTables);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [onlineOrders] = useState<OnlineOrder[]>(initialOnlineOrders);
+  const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>(initialOnlineOrders);
+  const [onlineOrdersLoading, setOnlineOrdersLoading] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>(() => {
     const saved = localStorage.getItem('pos_menu');
     return saved ? JSON.parse(saved) : menuItems;
@@ -94,6 +97,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('pos_menu', JSON.stringify(menu));
   }, [menu]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOnlineOrders = async () => {
+      setOnlineOrdersLoading(true);
+      try {
+        const response = await fetch(apiUrl('/online-orders'));
+        if (!response.ok) throw new Error('Failed to load online orders');
+
+        const data: OnlineOrder[] = await response.json();
+        if (mounted) setOnlineOrders(data);
+      } catch (error) {
+        console.error('Failed to fetch online orders', error);
+        if (mounted) setOnlineOrders([]);
+      } finally {
+        if (mounted) setOnlineOrdersLoading(false);
+      }
+    };
+
+    void loadOnlineOrders();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!currentUser) {
@@ -167,8 +196,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const updateOnlineOrderStatus = useCallback((orderId: string, status: OnlineOrderStatus) => {
-    void orderId;
-    void status;
+    setOnlineOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+
+    void fetch(apiUrl(`/online-orders/${orderId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(error => {
+      console.error('Failed to update online order status', error);
+    });
   }, []);
 
   const completePayment = useCallback((tableId: number) => {
@@ -214,7 +250,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      isAuthenticated, currentUser, login, logout, tables, orders, onlineOrders, menu,
+      isAuthenticated, currentUser, login, logout, tables, orders, onlineOrders, onlineOrdersLoading, menu,
       notifications, clearNotification, updateTableStatus, createOrder, updateOrderStatus,
       updateOnlineOrderStatus, completePayment, waiters, updateTableSeats, addMenuItem, updateMenuItem, addWaiter, removeWaiter,
     }}>

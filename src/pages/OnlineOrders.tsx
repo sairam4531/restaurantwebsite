@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { cn } from '@/lib/utils';
-import { Search, Filter } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { OnlineOrderStatus } from '@/data/mockData';
+import { apiUrl } from '@/lib/api';
 
 const statusFlow: OnlineOrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 
@@ -17,9 +18,20 @@ const statusLabels: Record<OnlineOrderStatus, string> = {
 };
 
 const OnlineOrders = () => {
-  const { onlineOrders, updateOnlineOrderStatus } = useApp();
+  const { onlineOrders, onlineOrdersLoading, updateOnlineOrderStatus } = useApp();
   const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+
+  const webhookExamples = [
+    {
+      platform: 'swiggy',
+      url: apiUrl('/online-orders/webhooks/swiggy'),
+    },
+    {
+      platform: 'zomato',
+      url: apiUrl('/online-orders/webhooks/zomato'),
+    },
+  ];
 
   const filtered = onlineOrders.filter(o => {
     if (platformFilter !== 'all' && o.platform !== platformFilter) return false;
@@ -67,6 +79,31 @@ const OnlineOrders = () => {
           ))}
         </div>
       </div>
+
+      <div className="glass-card p-4 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Dummy webhook endpoints</h2>
+          <p className="text-xs text-muted-foreground">Use these now, then replace them with real partner webhooks later.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {webhookExamples.map(example => (
+            <div key={example.platform} className="rounded-lg border border-border bg-background/50 p-3">
+              <p className="text-xs font-medium uppercase text-foreground mb-1">{example.platform}</p>
+              <p className="break-all text-xs text-muted-foreground">POST {example.url}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {onlineOrdersLoading && (
+        <div className="glass-card p-6 text-sm text-muted-foreground">Loading online orders...</div>
+      )}
+
+      {!onlineOrdersLoading && filtered.length === 0 && (
+        <div className="glass-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">No online orders yet. Send a POST request to one of the webhook URLs above.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(order => {
