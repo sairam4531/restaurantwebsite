@@ -27,7 +27,17 @@ app.get('/api/health', (req, res) => {
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 app.get('*', (req, res) => {
-  res.sendFile(path.join(distPath, 'index.html'));
+  const indexPath = path.join(distPath, 'index.html');
+  if (require('fs').existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({
+      error: 'Frontend build not found',
+      distPath,
+      exists: require('fs').existsSync(distPath),
+      hint: 'Run the build command: cd .. && npm install && npm run build'
+    });
+  }
 });
 
 // Connect to MongoDB and start server
