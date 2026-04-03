@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import {
   Table, Order, OnlineOrder, CartItem, MenuItem, OrderStatus, OnlineOrderStatus, MenuCategory,
   initialTables, initialOrders, initialOnlineOrders, menuItems, Waiter,
@@ -46,6 +46,8 @@ export const useApp = () => {
   return ctx;
 };
 
+const POLL_INTERVAL = 3000;
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     const saved = localStorage.getItem('pos_auth_user');
@@ -53,7 +55,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('pos_auth') === 'true');
   const [tables, setTables] = useState<Table[]>(initialTables);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>(initialOnlineOrders);
   const [onlineOrdersLoading, setOnlineOrdersLoading] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>(() => {
@@ -65,39 +67,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('pos_waiters');
     return saved ? JSON.parse(saved) : [];
   });
-  const [persistedTables, setPersistedTables] = useState<Table[]>(() => {
-    const saved = localStorage.getItem('pos_tables');
-    return saved ? JSON.parse(saved) : initialTables;
-  });
-  const [persistedOrders, setPersistedOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('pos_orders');
-    return saved ? JSON.parse(saved) : initialOrders;
-  });
 
-  useEffect(() => {
-    setTables(persistedTables);
-  }, [persistedTables]);
+  // Track known order IDs for notifications
+  const knownOrderIds = useRef<Set<string>>(new Set());
 
+  // --- Fetch orders from MongoDB ---
+  const fetchOrders = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl('/orders'));
+      if (!res.ok) return;
+      const data: Order[] = await res.json();
+      
+      // Check for new orders to notify
+      data.forEach(order => {
+        if (!knownOrderIds.current.has(order.id) && order.status !== 'completed') {
+          // Only notify if we already loaded once (not initial load)
+          if (knownOrderIds.current.size > 0) {
+            setNotifications(prev => [...prev, `New dine-in order ${order.id} for Table ${order.tableId}`]);
+          }
+        }
+      });
+      knownOrderIds.current = new Set(data.map(o => o.id));
+      
+      setOrders(data);
+    } catch (err) {
+      console.error('Failed to fetch orders', err);
+    }
+  }, []);
+
+  // --- Fetch tables from MongoDB ---
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await fetch(apiUrl('/tables'));
+      if (!res.ok) return;
+      const data: Table[] = await res.json();
+      if (data.length > 0) {
+        setTables(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch tables', err);
+    }
+  }, []);
+
+  // --- Initial load + polling ---
   useEffect(() => {
-    setOrders(persistedOrders);
-  }, [persistedOrders]);
+    let mounted = true;
+    
+    const poll = async () => {
+      if (!mounted) return;
+      await Promise.all([fetchOrders(), fetchTables()]);
+    };
+
+    void poll();
+    const interval = setInterval(poll, POLL_INTERVAL);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [fetchOrders, fetchTables]);
 
   useEffect(() => {
     localStorage.setItem('pos_waiters', JSON.stringify(waiters));
   }, [waiters]);
 
   useEffect(() => {
-    localStorage.setItem('pos_tables', JSON.stringify(tables));
-  }, [tables]);
-
-  useEffect(() => {
-    localStorage.setItem('pos_orders', JSON.stringify(orders));
-  }, [orders]);
-
-  useEffect(() => {
     localStorage.setItem('pos_menu', JSON.stringify(menu));
   }, [menu]);
 
+  // --- Online orders fetch ---
   useEffect(() => {
     let mounted = true;
 
@@ -106,7 +144,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const response = await fetch(apiUrl('/online-orders'));
         if (!response.ok) throw new Error('Failed to load online orders');
-
         const data: OnlineOrder[] = await response.json();
         if (mounted) setOnlineOrders(data);
       } catch (error) {
@@ -118,10 +155,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     void loadOnlineOrders();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
@@ -131,7 +165,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.removeItem('pos_auth_user');
       return;
     }
-
     setIsAuthenticated(true);
     localStorage.setItem('pos_auth', 'true');
     localStorage.setItem('pos_auth_user', JSON.stringify(currentUser));
@@ -142,13 +175,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser({ role: 'admin', username, name: 'Admin' });
       return true;
     }
-
     const matchedWaiter = waiters.find(waiter => waiter.username === username && waiter.password === password);
     if (matchedWaiter) {
       setCurrentUser({ role: 'waiter', username: matchedWaiter.username, name: matchedWaiter.name });
       return true;
     }
-
     return false;
   }, [waiters]);
 
@@ -161,13 +192,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTableStatus = useCallback((tableId: number, status: Table['status']) => {
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
-    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
+    void fetch(apiUrl(`/tables/${tableId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(err => console.error('Failed to update table status', err));
   }, []);
 
   const updateTableSeats = useCallback((tableId: number, seats: number) => {
     if (seats < 1) return;
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, seats } : t));
-    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, seats } : t));
+    void fetch(apiUrl(`/tables/${tableId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seats }),
+    }).catch(err => console.error('Failed to update table seats', err));
   }, []);
 
   const createOrder = useCallback((tableId: number, items: CartItem[]) => {
@@ -176,43 +215,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const order: Order = {
-      id: `ORD${String(orders.length + 1).padStart(3, '0')}`,
+      id: `ORD${String(Date.now()).slice(-6)}`,
       tableId,
       items,
       total,
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
+
+    // Optimistic update
     setOrders(prev => [...prev, order]);
-    setPersistedOrders(prev => [...prev, order]);
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'occupied' as const, orderId: order.id } : t));
-    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'occupied' as const, orderId: order.id } : t));
     setNotifications(prev => [...prev, `New dine-in order ${order.id} for Table ${tableId}`]);
+
+    // Persist to MongoDB
+    void fetch(apiUrl('/orders'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(order),
+    }).catch(err => console.error('Failed to save order', err));
+
+    void fetch(apiUrl(`/tables/${tableId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'occupied', orderId: order.id }),
+    }).catch(err => console.error('Failed to update table', err));
   }, [orders]);
 
   const updateOrderStatus = useCallback((orderId: string, status: OrderStatus) => {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    setPersistedOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    void fetch(apiUrl(`/orders/${orderId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    }).catch(err => console.error('Failed to update order status', err));
   }, []);
 
   const updateOnlineOrderStatus = useCallback((orderId: string, status: OnlineOrderStatus) => {
     setOnlineOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-
     void fetch(apiUrl(`/online-orders/${orderId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
-    }).catch(error => {
-      console.error('Failed to update online order status', error);
-    });
+    }).catch(error => console.error('Failed to update online order status', error));
   }, []);
 
   const completePayment = useCallback((tableId: number) => {
     setTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'available' as const, orderId: undefined } : t));
-    setPersistedTables(prev => prev.map(t => t.id === tableId ? { ...t, status: 'available' as const, orderId: undefined } : t));
-    setOrders(prev => prev.map(o => o.tableId === tableId && o.status !== 'completed' ? { ...o, status: 'completed' as const } : o));
-    setPersistedOrders(prev => prev.map(o => o.tableId === tableId && o.status !== 'completed' ? { ...o, status: 'completed' as const } : o));
-  }, []);
+    
+    // Find active order for this table and mark completed
+    const activeOrder = orders.find(o => o.tableId === tableId && o.status !== 'completed');
+    if (activeOrder) {
+      setOrders(prev => prev.map(o => o.id === activeOrder.id ? { ...o, status: 'completed' as const } : o));
+      void fetch(apiUrl(`/orders/${activeOrder.id}`), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      }).catch(err => console.error('Failed to complete order', err));
+    }
+
+    void fetch(apiUrl(`/tables/${tableId}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'available', orderId: null }),
+    }).catch(err => console.error('Failed to reset table', err));
+  }, [orders]);
 
   const clearNotification = useCallback((index: number) => {
     setNotifications(prev => prev.filter((_, i) => i !== index));
@@ -237,10 +304,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const addMenuItem = useCallback((item: Omit<MenuItem, 'id'>) => {
-    const nextItem: MenuItem = {
-      ...item,
-      id: `m${Date.now()}`,
-    };
+    const nextItem: MenuItem = { ...item, id: `m${Date.now()}` };
     setMenu(prev => [...prev, nextItem]);
   }, []);
 
